@@ -1,0 +1,298 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 14.2
+-- Dumped by pg_dump version 14.2
+
+-- Started on 2022-06-06 16:14:23
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- TOC entry 3345 (class 1262 OID 32890)
+-- Name: rental_of_rooms; Type: DATABASE; Schema: -; Owner: postgres
+--
+
+CREATE DATABASE rental_of_rooms WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE = 'Russian_Russia.1251';
+
+
+ALTER DATABASE rental_of_rooms OWNER TO postgres;
+
+\connect rental_of_rooms
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- TOC entry 216 (class 1255 OID 32974)
+-- Name: delete_client(character varying); Type: PROCEDURE; Schema: public; Owner: postgres
+--
+
+CREATE PROCEDURE public.delete_client(IN idclient character varying)
+    LANGUAGE sql
+    AS $$
+DELETE FROM rents WHERE rents.idcl = idclient;
+DELETE FROM clients WHERE clients.idcl = idclient;
+$$;
+
+
+ALTER PROCEDURE public.delete_client(IN idclient character varying) OWNER TO postgres;
+
+--
+-- TOC entry 217 (class 1255 OID 32977)
+-- Name: delete_room(character varying); Type: PROCEDURE; Schema: public; Owner: postgres
+--
+
+CREATE PROCEDURE public.delete_room(IN idroom character varying)
+    LANGUAGE sql
+    AS $$
+DELETE FROM rents WHERE rents.idroom = idroom;
+DELETE FROM rooms WHERE rooms.idroom = idroom;
+$$;
+
+
+ALTER PROCEDURE public.delete_room(IN idroom character varying) OWNER TO postgres;
+
+--
+-- TOC entry 215 (class 1255 OID 32957)
+-- Name: trigger_before_lns(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.trigger_before_lns() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$BEGIN
+if (NEW.st_time>NEW.fn_time)  then
+    RAISE EXCEPTION
+    'can''t create record. End time less then begin time';
+end if;
+return NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.trigger_before_lns() OWNER TO postgres;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- TOC entry 210 (class 1259 OID 32923)
+-- Name: clients; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.clients (
+    idcl character varying(5) NOT NULL,
+    name_org text NOT NULL,
+    tin text NOT NULL,
+    address text NOT NULL,
+    phone text NOT NULL,
+    contact text NOT NULL
+);
+
+
+ALTER TABLE public.clients OWNER TO postgres;
+
+--
+-- TOC entry 211 (class 1259 OID 32930)
+-- Name: rents; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.rents (
+    idrent character varying(5) NOT NULL,
+    idroom character varying(5) NOT NULL,
+    idcl character varying(5) NOT NULL,
+    st_time date NOT NULL,
+    fn_time date NOT NULL
+);
+
+
+ALTER TABLE public.rents OWNER TO postgres;
+
+--
+-- TOC entry 209 (class 1259 OID 32918)
+-- Name: rooms; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.rooms (
+    idroom character varying(5) NOT NULL,
+    floor integer NOT NULL,
+    area double precision NOT NULL,
+    air_cond boolean NOT NULL,
+    cost_per_day double precision NOT NULL
+);
+
+
+ALTER TABLE public.rooms OWNER TO postgres;
+
+--
+-- TOC entry 214 (class 1259 OID 32969)
+-- Name: free_rooms_now; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.free_rooms_now AS
+ SELECT rooms.idroom,
+    rooms.floor,
+    rooms.area,
+    rooms.air_cond,
+    rooms.cost_per_day
+   FROM public.rooms
+  WHERE (NOT ((rooms.idroom)::text IN ( SELECT rents.idroom
+           FROM public.rents
+          WHERE ((now() >= rents.st_time) AND (now() <= rents.fn_time)))));
+
+
+ALTER TABLE public.free_rooms_now OWNER TO postgres;
+
+--
+-- TOC entry 213 (class 1259 OID 32964)
+-- Name: occupied_rooms; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.occupied_rooms AS
+ SELECT rents.idroom AS num_of_room,
+    clients.name_org AS name_of_client,
+    clients.address,
+    clients.contact,
+    rents.st_time AS begin_of_rent,
+    rents.fn_time AS end_of_rent
+   FROM ((public.rents
+     JOIN public.clients ON (((rents.idcl)::text = (clients.idcl)::text)))
+     JOIN public.rooms ON (((rents.idroom)::text = (rooms.idroom)::text)))
+  WHERE ((now() >= rents.st_time) AND (now() <= rents.fn_time));
+
+
+ALTER TABLE public.occupied_rooms OWNER TO postgres;
+
+--
+-- TOC entry 212 (class 1259 OID 32959)
+-- Name: sumcost_per_day_in_tmp_time; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.sumcost_per_day_in_tmp_time AS
+ SELECT COALESCE(( SELECT sum(rooms.cost_per_day) AS sum
+           FROM (public.rents
+             JOIN public.rooms ON (((rooms.idroom)::text = (rents.idroom)::text)))
+          WHERE (((clients.idcl)::text = (rents.idcl)::text) AND ((now() >= rents.st_time) AND (now() <= rents.fn_time)))), (0)::double precision) AS sumcost_per_day_in_temporary_time,
+    clients.name_org AS name_of_client,
+    clients.phone,
+    clients.contact
+   FROM public.clients;
+
+
+ALTER TABLE public.sumcost_per_day_in_tmp_time OWNER TO postgres;
+
+--
+-- TOC entry 3338 (class 0 OID 32923)
+-- Dependencies: 210
+-- Data for Name: clients; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public.clients VALUES ('1', 'Postgres INC', '23456789', 'USA,Massachusetts,Newburyport', '81234567890', 'Michael Stonebraker');
+INSERT INTO public.clients VALUES ('2', 'Google', '13456789', 'USA, California, Menlo Park', '80987654321', 'Pichai Sundararajan');
+INSERT INTO public.clients VALUES ('3', 'Apple INC', '2262538877', 'USA, California, Los Altos', '89453657815', 'Steve Jobs');
+INSERT INTO public.clients VALUES ('4', 'INTEL', '98700433', 'USA, California, Santa Clara', '89999994444', 'Gordon Moore');
+
+
+--
+-- TOC entry 3339 (class 0 OID 32930)
+-- Dependencies: 211
+-- Data for Name: rents; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public.rents VALUES ('2', '3', '2', '2020-10-01', '2022-11-01');
+INSERT INTO public.rents VALUES ('4', '2', '2', '2010-01-01', '2040-12-31');
+INSERT INTO public.rents VALUES ('1', '1', '1', '2021-09-01', '2022-05-31');
+INSERT INTO public.rents VALUES ('3', '5', '3', '2010-01-01', '2023-12-31');
+
+
+--
+-- TOC entry 3337 (class 0 OID 32918)
+-- Dependencies: 209
+-- Data for Name: rooms; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public.rooms VALUES ('1', 1, 34.6, true, 2000);
+INSERT INTO public.rooms VALUES ('2', 3, 32.6, true, 1900);
+INSERT INTO public.rooms VALUES ('3', 1, 50, true, 3000);
+INSERT INTO public.rooms VALUES ('4', 5, 20, false, 1200);
+INSERT INTO public.rooms VALUES ('5', 4, 100, true, 4000);
+
+
+--
+-- TOC entry 3189 (class 2606 OID 32929)
+-- Name: clients clients_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.clients
+    ADD CONSTRAINT clients_pk PRIMARY KEY (idcl);
+
+
+--
+-- TOC entry 3191 (class 2606 OID 32934)
+-- Name: rents rents_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.rents
+    ADD CONSTRAINT rents_pk PRIMARY KEY (idrent);
+
+
+--
+-- TOC entry 3187 (class 2606 OID 32922)
+-- Name: rooms rooms_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.rooms
+    ADD CONSTRAINT rooms_pk PRIMARY KEY (idroom);
+
+
+--
+-- TOC entry 3194 (class 2620 OID 32958)
+-- Name: rents trig; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trig BEFORE INSERT ON public.rents FOR EACH ROW EXECUTE FUNCTION public.trigger_before_lns();
+
+
+--
+-- TOC entry 3192 (class 2606 OID 32945)
+-- Name: rents fk1_rents; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.rents
+    ADD CONSTRAINT fk1_rents FOREIGN KEY (idroom) REFERENCES public.rooms(idroom) ON UPDATE CASCADE ON DELETE RESTRICT NOT VALID;
+
+
+--
+-- TOC entry 3193 (class 2606 OID 32950)
+-- Name: rents fk2_rents; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.rents
+    ADD CONSTRAINT fk2_rents FOREIGN KEY (idcl) REFERENCES public.clients(idcl) ON UPDATE CASCADE ON DELETE RESTRICT NOT VALID;
+
+
+-- Completed on 2022-06-06 16:14:23
+
+--
+-- PostgreSQL database dump complete
+--
+
