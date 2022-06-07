@@ -5,7 +5,7 @@
 -- Dumped from database version 14.2
 -- Dumped by pg_dump version 14.2
 
--- Started on 2022-06-06 16:14:23
+-- Started on 2022-06-06 22:29:24
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -19,7 +19,7 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- TOC entry 3345 (class 1262 OID 32890)
+-- TOC entry 3358 (class 1262 OID 32890)
 -- Name: rental_of_rooms; Type: DATABASE; Schema: -; Owner: postgres
 --
 
@@ -42,7 +42,7 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- TOC entry 216 (class 1255 OID 32974)
+-- TOC entry 218 (class 1255 OID 32974)
 -- Name: delete_client(character varying); Type: PROCEDURE; Schema: public; Owner: postgres
 --
 
@@ -57,7 +57,7 @@ $$;
 ALTER PROCEDURE public.delete_client(IN idclient character varying) OWNER TO postgres;
 
 --
--- TOC entry 217 (class 1255 OID 32977)
+-- TOC entry 219 (class 1255 OID 32977)
 -- Name: delete_room(character varying); Type: PROCEDURE; Schema: public; Owner: postgres
 --
 
@@ -72,7 +72,7 @@ $$;
 ALTER PROCEDURE public.delete_room(IN idroom character varying) OWNER TO postgres;
 
 --
--- TOC entry 215 (class 1255 OID 32957)
+-- TOC entry 217 (class 1255 OID 32957)
 -- Name: trigger_before_lns(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -183,6 +183,40 @@ CREATE VIEW public.occupied_rooms AS
 ALTER TABLE public.occupied_rooms OWNER TO postgres;
 
 --
+-- TOC entry 215 (class 1259 OID 32980)
+-- Name: payments; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.payments (
+    idpayment integer NOT NULL,
+    idcl character varying(5) NOT NULL,
+    valuepay integer NOT NULL,
+    datepay date NOT NULL
+);
+
+
+ALTER TABLE public.payments OWNER TO postgres;
+
+--
+-- TOC entry 216 (class 1259 OID 32990)
+-- Name: sum_of_payments; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.sum_of_payments AS
+ SELECT clients.idcl,
+    summ.sum,
+    clients.name_org,
+    clients.tin
+   FROM (public.clients
+     JOIN ( SELECT payments.idcl,
+            sum(payments.valuepay) AS sum
+           FROM public.payments
+          GROUP BY payments.idcl) summ ON (((summ.idcl)::text = (clients.idcl)::text)));
+
+
+ALTER TABLE public.sum_of_payments OWNER TO postgres;
+
+--
 -- TOC entry 212 (class 1259 OID 32959)
 -- Name: sumcost_per_day_in_tmp_time; Type: VIEW; Schema: public; Owner: postgres
 --
@@ -191,7 +225,7 @@ CREATE VIEW public.sumcost_per_day_in_tmp_time AS
  SELECT COALESCE(( SELECT sum(rooms.cost_per_day) AS sum
            FROM (public.rents
              JOIN public.rooms ON (((rooms.idroom)::text = (rents.idroom)::text)))
-          WHERE (((clients.idcl)::text = (rents.idcl)::text) AND ((now() >= rents.st_time) AND (now() <= rents.fn_time)))), (0)::double precision) AS sumcost_per_day_in_temporary_time,
+          WHERE (((clients.idcl)::text = (rents.idcl)::text) AND (now() >= rents.st_time) AND (now() <= rents.fn_time))), (0)::double precision) AS sumcost_per_day_in_temporary_time,
     clients.name_org AS name_of_client,
     clients.phone,
     clients.contact
@@ -201,7 +235,7 @@ CREATE VIEW public.sumcost_per_day_in_tmp_time AS
 ALTER TABLE public.sumcost_per_day_in_tmp_time OWNER TO postgres;
 
 --
--- TOC entry 3338 (class 0 OID 32923)
+-- TOC entry 3350 (class 0 OID 32923)
 -- Dependencies: 210
 -- Data for Name: clients; Type: TABLE DATA; Schema: public; Owner: postgres
 --
@@ -213,7 +247,23 @@ INSERT INTO public.clients VALUES ('4', 'INTEL', '98700433', 'USA, California, S
 
 
 --
--- TOC entry 3339 (class 0 OID 32930)
+-- TOC entry 3352 (class 0 OID 32980)
+-- Dependencies: 215
+-- Data for Name: payments; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public.payments VALUES (1, '1', 12000, '2022-01-01');
+INSERT INTO public.payments VALUES (2, '1', 9000, '2022-05-30');
+INSERT INTO public.payments VALUES (3, '2', 200000, '2018-01-01');
+INSERT INTO public.payments VALUES (4, '2', 10000, '2020-06-01');
+INSERT INTO public.payments VALUES (5, '2', 12000, '2022-06-01');
+INSERT INTO public.payments VALUES (6, '3', 12000, '2016-04-01');
+INSERT INTO public.payments VALUES (7, '3', 40000, '2018-07-23');
+INSERT INTO public.payments VALUES (8, '3', 10000, '2022-03-16');
+
+
+--
+-- TOC entry 3351 (class 0 OID 32930)
 -- Dependencies: 211
 -- Data for Name: rents; Type: TABLE DATA; Schema: public; Owner: postgres
 --
@@ -225,7 +275,7 @@ INSERT INTO public.rents VALUES ('3', '5', '3', '2010-01-01', '2023-12-31');
 
 
 --
--- TOC entry 3337 (class 0 OID 32918)
+-- TOC entry 3349 (class 0 OID 32918)
 -- Dependencies: 209
 -- Data for Name: rooms; Type: TABLE DATA; Schema: public; Owner: postgres
 --
@@ -238,7 +288,7 @@ INSERT INTO public.rooms VALUES ('5', 4, 100, true, 4000);
 
 
 --
--- TOC entry 3189 (class 2606 OID 32929)
+-- TOC entry 3197 (class 2606 OID 32929)
 -- Name: clients clients_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -247,7 +297,16 @@ ALTER TABLE ONLY public.clients
 
 
 --
--- TOC entry 3191 (class 2606 OID 32934)
+-- TOC entry 3201 (class 2606 OID 32984)
+-- Name: payments payments_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.payments
+    ADD CONSTRAINT payments_pkey PRIMARY KEY (idpayment);
+
+
+--
+-- TOC entry 3199 (class 2606 OID 32934)
 -- Name: rents rents_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -256,7 +315,7 @@ ALTER TABLE ONLY public.rents
 
 
 --
--- TOC entry 3187 (class 2606 OID 32922)
+-- TOC entry 3195 (class 2606 OID 32922)
 -- Name: rooms rooms_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -265,7 +324,7 @@ ALTER TABLE ONLY public.rooms
 
 
 --
--- TOC entry 3194 (class 2620 OID 32958)
+-- TOC entry 3205 (class 2620 OID 32958)
 -- Name: rents trig; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -273,7 +332,7 @@ CREATE TRIGGER trig BEFORE INSERT ON public.rents FOR EACH ROW EXECUTE FUNCTION 
 
 
 --
--- TOC entry 3192 (class 2606 OID 32945)
+-- TOC entry 3202 (class 2606 OID 32945)
 -- Name: rents fk1_rents; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -282,7 +341,7 @@ ALTER TABLE ONLY public.rents
 
 
 --
--- TOC entry 3193 (class 2606 OID 32950)
+-- TOC entry 3203 (class 2606 OID 32950)
 -- Name: rents fk2_rents; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -290,7 +349,16 @@ ALTER TABLE ONLY public.rents
     ADD CONSTRAINT fk2_rents FOREIGN KEY (idcl) REFERENCES public.clients(idcl) ON UPDATE CASCADE ON DELETE RESTRICT NOT VALID;
 
 
--- Completed on 2022-06-06 16:14:23
+--
+-- TOC entry 3204 (class 2606 OID 32985)
+-- Name: payments forkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.payments
+    ADD CONSTRAINT forkey FOREIGN KEY (idcl) REFERENCES public.clients(idcl) ON UPDATE CASCADE ON DELETE RESTRICT NOT VALID;
+
+
+-- Completed on 2022-06-06 22:29:24
 
 --
 -- PostgreSQL database dump complete
